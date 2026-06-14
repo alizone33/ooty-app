@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 
 // ── Auth Config ────────────────────────────────────────────────────────────────
@@ -1012,13 +1012,20 @@ function ReportsPage({ savedEntries, indentData }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ══════════════════════════════════════════════════════════════════════════════
-export default function App() {
-  const [auth, setAuth] = useState(null); // {username, role}
-  const [page, setPage] = useState(null);
-  const [indentData, setIndentData] = useState(null); // shared across admin & store
-  const [savedEntries, setSavedEntries] = useState([]); // all submitted entries
+const [indentData, setIndentData] = useState(null);
+const [savedEntries, setSavedEntries] = useState([]);useEffect(() => {
+  localStorage.setItem(
+    "indentData",
+    JSON.stringify(indentData)
+  );
+}, [indentData]);
 
-  const handleLogin = (username, role) => {
+useEffect(() => {
+  localStorage.setItem(
+    "savedEntries",
+    JSON.stringify(savedEntries)
+  );
+}, [savedEntries]);
     setAuth({username, role});
     setPage(role==="admin" ? "upload" : "entry");
   };
