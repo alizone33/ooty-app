@@ -1012,22 +1012,31 @@ function ReportsPage({ savedEntries, indentData }) {
 // ══════════════════════════════════════════════════════════════════════════════
 // ROOT APP
 // ══════════════════════════════════════════════════════════════════════════════
-const [indentData, setIndentData] = useState(null);
-const [savedEntries, setSavedEntries] = useState([]);useEffect(() => {
-  localStorage.setItem(
-    "indentData",
-    JSON.stringify(indentData)
-  );
-}, [indentData]);
+export default function App() {
+  const [auth, setAuth] = useState(null);
+  const [page, setPage] = useState(null);
 
-useEffect(() => {
-  localStorage.setItem(
-    "savedEntries",
-    JSON.stringify(savedEntries)
-  );
-}, [savedEntries]);
-    setAuth({username, role});
-    setPage(role==="admin" ? "upload" : "entry");
+  const [indentData, setIndentData] = useState(() => {
+    const saved = localStorage.getItem("indentData");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [savedEntries, setSavedEntries] = useState(() => {
+    const saved = localStorage.getItem("savedEntries");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("indentData", JSON.stringify(indentData));
+  }, [indentData]);
+
+  useEffect(() => {
+    localStorage.setItem("savedEntries", JSON.stringify(savedEntries));
+  }, [savedEntries]);
+
+  const handleLogin = (username, role) => {
+    setAuth({ username, role });
+    setPage(role === "admin" ? "upload" : "entry");
   };
 
   const handleLogout = () => {
@@ -1041,25 +1050,46 @@ useEffect(() => {
 
   const handleSaveEntry = (entry) => {
     setSavedEntries(prev => {
-      // Replace if same date+store
-      const filtered = prev.filter(e=>!(e.date===entry.date && e.store===entry.store));
+      const filtered = prev.filter(
+        e => !(e.date === entry.date && e.store === entry.store)
+      );
       return [...filtered, entry];
     });
   };
 
-  if (!auth) return <LoginPage onLogin={handleLogin}/>;
+  if (!auth) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
 
   return (
-    <div style={{background:C.bg,minHeight:"100vh"}}>
-      <NavBar role={auth.role} page={page} onNav={setPage} onLogout={handleLogout}/>
-      {auth.role==="admin" && page==="upload" && (
-        <AdminUploadPage indentData={indentData} onUpload={handleUpload}/>
+    <div style={{ background: C.bg, minHeight: "100vh" }}>
+      <NavBar
+        role={auth.role}
+        page={page}
+        onNav={setPage}
+        onLogout={handleLogout}
+      />
+
+      {auth.role === "admin" && page === "upload" && (
+        <AdminUploadPage
+          indentData={indentData}
+          onUpload={handleUpload}
+        />
       )}
-      {auth.role==="store" && page==="entry" && (
-        <EntryPage indentData={indentData} savedEntries={savedEntries} onSaveEntry={handleSaveEntry}/>
+
+      {auth.role === "store" && page === "entry" && (
+        <EntryPage
+          indentData={indentData}
+          savedEntries={savedEntries}
+          onSaveEntry={handleSaveEntry}
+        />
       )}
-      {page==="reports" && (
-        <ReportsPage savedEntries={savedEntries} indentData={indentData}/>
+
+      {page === "reports" && (
+        <ReportsPage
+          savedEntries={savedEntries}
+          indentData={indentData}
+        />
       )}
     </div>
   );
