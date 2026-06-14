@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
+import { supabase } from "./supabase";
 
 // ── Auth Config ────────────────────────────────────────────────────────────────
 const USERS = {
