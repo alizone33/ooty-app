@@ -89,8 +89,21 @@ function Logo() {
   );
 }
 
+// ── Loading Overlay ────────────────────────────────────────────────────────────
+function LoadingScreen({ message = "Loading…" }) {
+  return (
+    <div style={{
+      minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center",
+      background:C.bg, fontFamily:"'Courier New',Courier,monospace", flexDirection:"column", gap:16,
+    }}>
+      <div style={{fontSize:40}}>🥬</div>
+      <div style={{fontWeight:700, color:C.accent, fontSize:14, letterSpacing:1}}>{message}</div>
+    </div>
+  );
+}
+
 // ── Nav Bar ────────────────────────────────────────────────────────────────────
-function NavBar({ role, page, onNav, onLogout }) {
+function NavBar({ role, page, onNav, onLogout, syncing }) {
   const adminTabs = [
     { id:"upload", label:"📤 Import" },
     { id:"reports", label:"📊 Reports" },
@@ -111,6 +124,9 @@ function NavBar({ role, page, onNav, onLogout }) {
       <div style={{display:"flex", alignItems:"center", gap:6}}>
         <span style={{fontSize:18}}>🥬</span>
         <span style={{fontWeight:800, fontSize:13, color:C.accent, letterSpacing:2}}>OVF</span>
+        {syncing && (
+          <span style={{fontSize:10, color:C.textMut, marginLeft:6, letterSpacing:.5}}>⏳ saving…</span>
+        )}
       </div>
       <div style={{display:"flex", gap:4}}>
         {tabs.map(t => (
@@ -234,7 +250,6 @@ function AdminUploadPage({ indentData, onUpload }) {
     reader.onload = (e) => {
       try {
         const wb = XLSX.read(e.target.result, { type:"array" });
-        // Try INDENT sheet first, then first sheet
         const sheetName = wb.SheetNames.includes("INDENT") ? "INDENT" : wb.SheetNames[0];
         const ws = wb.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:0 });
@@ -352,10 +367,9 @@ function AdminUploadPage({ indentData, onUpload }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ENTRY FLOW — Store User (Steps: Store Select → Entry → Review → Done)
+// ENTRY FLOW — Store User
 // ══════════════════════════════════════════════════════════════════════════════
 
-// ── Add Extra Item Modal ───────────────────────────────────────────────────────
 function AddExtraModal({ products, onAdd, onClose }) {
   const [code, setCode] = useState("");
   const [found, setFound] = useState(null);
@@ -439,9 +453,8 @@ function AddExtraModal({ products, onAdd, onClose }) {
   );
 }
 
-// ── Entry Page ─────────────────────────────────────────────────────────────────
 function EntryPage({ indentData, savedEntries, onSaveEntry }) {
-  const [entryStep, setEntryStep] = useState(1); // 1=select store+date, 2=entry, 3=review
+  const [entryStep, setEntryStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const [storeSearch, setStoreSearch] = useState("");
   const [selectedStore, setSelectedStore] = useState(null);
@@ -458,7 +471,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
   const products = indentData ? indentData.products : [];
   const stores = indentData ? indentData.stores : [];
 
-  // Check if there's existing entry for selected date+store
   const existingEntry = selectedDate && selectedStore
     ? savedEntries.find(e=>e.date===selectedDate && e.store===selectedStore)
     : null;
@@ -467,7 +479,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
     setSelectedStore(store);
     const existing = savedEntries.find(e=>e.date===selectedDate && e.store===store);
     if (existing) {
-      // Load existing data
       const init = {};
       existing.items.forEach(item => { if (!item.isExtra) init[item.code] = item.receivedQty; });
       setReceived(init);
@@ -530,7 +541,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
   };
 
   const saveAndFinish = () => {
-    // Flatten all items for storage
     const allItems = [];
     reviewData.cats.forEach(({items})=>allItems.push(...items));
     reviewData.extraItems.forEach(e=>allItems.push({...e, isExtra:true}));
@@ -556,7 +566,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
     XLSX.writeFile(wb, `receiving_${selectedStore}_${dateLabel}.xlsx`);
   };
 
-  // ── No indent loaded ───────────────────────────────────────────────────────
   if (!indentData) {
     return (
       <div style={{...S.root, display:"block"}}>
@@ -571,7 +580,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
     );
   }
 
-  // ── Step 1: Select date + store ───────────────────────────────────────────
   if (entryStep===1) {
     const filtered = stores.filter(s=>s.toLowerCase().includes(storeSearch.toLowerCase()));
     return (
@@ -615,7 +623,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
     );
   }
 
-  // ── Step 2: Entry ─────────────────────────────────────────────────────────
   if (entryStep===2) {
     const isExtraTab = activeTab===EXTRA_TAB;
     const tabProds = isExtraTab ? [] : storeProducts(activeTab);
@@ -636,7 +643,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
               {existingEntry && <span style={{marginLeft:8,color:C.accentLt,fontSize:11}}>✓ Editing saved entry</span>}
             </div>
 
-            {/* Category tabs */}
             <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap",alignItems:"center"}}>
               {categories.map(cat=>{
                 const entered=enteredCount(cat),total=totalCount(cat);
@@ -772,7 +778,6 @@ function EntryPage({ indentData, savedEntries, onSaveEntry }) {
     );
   }
 
-  // ── Step 3: Review ────────────────────────────────────────────────────────
   if (entryStep===3 && reviewData) {
     const diffLabel = (diff)=>{
       if(diff===0) return {text:"✓ Full",color:C.accentLt,bg:"rgba(26,102,65,.10)"};
@@ -890,7 +895,6 @@ function ReportsPage({ savedEntries, indentData }) {
     return inRange && inStore;
   });
 
-  // Flatten to rows
   const rows = [];
   filtered.forEach(entry => {
     entry.items.forEach(item => {
@@ -928,7 +932,6 @@ function ReportsPage({ savedEntries, indentData }) {
           <Logo/>
           <h1 style={S.h1}>Reports</h1>
 
-          {/* Filters */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr auto",gap:12,marginBottom:20,alignItems:"flex-end"}}>
             <div>
               <label style={S.label}>From Date</label>
@@ -954,7 +957,6 @@ function ReportsPage({ savedEntries, indentData }) {
             </button>
           </div>
 
-          {/* Summary cards */}
           <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:10,marginBottom:20}}>
             {[
               {label:"Entries",val:filtered.length,icon:"📋"},
@@ -970,7 +972,6 @@ function ReportsPage({ savedEntries, indentData }) {
             ))}
           </div>
 
-          {/* Table */}
           {rows.length===0 ? (
             <div style={{textAlign:"center",padding:"40px 20px",color:C.textDim,border:`1px dashed ${C.border}`,borderRadius:10}}>
               <div style={{fontSize:30,marginBottom:8}}>📭</div>
@@ -1011,29 +1012,112 @@ function ReportsPage({ savedEntries, indentData }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// ROOT APP
+// ROOT APP — Supabase persistence
 // ══════════════════════════════════════════════════════════════════════════════
 export default function App() {
   const [auth, setAuth] = useState(null);
   const [page, setPage] = useState(null);
+  const [loading, setLoading] = useState(true);   // initial data fetch
+  const [syncing, setSyncing] = useState(false);  // background save indicator
 
-  const [indentData, setIndentData] = useState(() => {
-    const saved = localStorage.getItem("indentData");
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [indentData, setIndentData] = useState(null);
+  const [savedEntries, setSavedEntries] = useState([]);
 
-  const [savedEntries, setSavedEntries] = useState(() => {
-    const saved = localStorage.getItem("savedEntries");
-    return saved ? JSON.parse(saved) : [];
-  });
-
+  // ── 1. Load data from Supabase on app start ────────────────────────────────
   useEffect(() => {
-    localStorage.setItem("indentData", JSON.stringify(indentData));
-  }, [indentData]);
+    const fetchAll = async () => {
+      try {
+        // Fetch latest indent file
+        const { data: indentRows } = await supabase
+          .from("indent_data")
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(1);
 
-  useEffect(() => {
-    localStorage.setItem("savedEntries", JSON.stringify(savedEntries));
-  }, [savedEntries]);
+        if (indentRows && indentRows.length > 0) {
+          const row = indentRows[0];
+          setIndentData({
+            fileName:   row.file_name,
+            uploadedAt: row.uploaded_at,
+            products:   row.products,
+            stores:     row.stores,
+          });
+        }
+
+        // Fetch all received entries
+        const { data: entryRows } = await supabase
+          .from("received_entries")
+          .select("*")
+          .order("date", { ascending: false });
+
+        if (entryRows && entryRows.length > 0) {
+          setSavedEntries(
+            entryRows.map(r => ({
+              date:    r.date,
+              store:   r.store,
+              items:   r.items,
+              savedAt: r.saved_at,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Supabase load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAll();
+  }, []);
+
+  // ── 2. Save indent data to Supabase when admin uploads ────────────────────
+  const handleUpload = async (data) => {
+    setIndentData(data);
+    setSyncing(true);
+    try {
+      // Delete old indent, insert new one (single-row pattern)
+      await supabase.from("indent_data").delete().neq("id", 0);
+      await supabase.from("indent_data").insert({
+        file_name:   data.fileName,
+        uploaded_at: data.uploadedAt,
+        products:    data.products,
+        stores:      data.stores,
+      });
+    } catch (err) {
+      console.error("Failed to save indent data:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // ── 3. Save/update a single entry to Supabase ────────────────────────────
+  const handleSaveEntry = async (entry) => {
+    // Update local state immediately (optimistic)
+    setSavedEntries(prev => {
+      const filtered = prev.filter(
+        e => !(e.date === entry.date && e.store === entry.store)
+      );
+      return [...filtered, entry];
+    });
+
+    setSyncing(true);
+    try {
+      await supabase
+        .from("received_entries")
+        .upsert(
+          {
+            date:     entry.date,
+            store:    entry.store,
+            items:    entry.items,
+            saved_at: entry.savedAt,
+          },
+          { onConflict: "date,store" }   // update if same date+store exists
+        );
+    } catch (err) {
+      console.error("Failed to save entry:", err);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleLogin = (username, role) => {
     setAuth({ username, role });
@@ -1045,22 +1129,10 @@ export default function App() {
     setPage(null);
   };
 
-  const handleUpload = (data) => {
-    setIndentData(data);
-  };
+  // ── Show loading screen while fetching from Supabase ─────────────────────
+  if (loading) return <LoadingScreen message="Loading data…" />;
 
-  const handleSaveEntry = (entry) => {
-    setSavedEntries(prev => {
-      const filtered = prev.filter(
-        e => !(e.date === entry.date && e.store === entry.store)
-      );
-      return [...filtered, entry];
-    });
-  };
-
-  if (!auth) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
+  if (!auth) return <LoginPage onLogin={handleLogin} />;
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh" }}>
@@ -1069,13 +1141,11 @@ export default function App() {
         page={page}
         onNav={setPage}
         onLogout={handleLogout}
+        syncing={syncing}
       />
 
       {auth.role === "admin" && page === "upload" && (
-        <AdminUploadPage
-          indentData={indentData}
-          onUpload={handleUpload}
-        />
+        <AdminUploadPage indentData={indentData} onUpload={handleUpload} />
       )}
 
       {auth.role === "store" && page === "entry" && (
@@ -1087,10 +1157,7 @@ export default function App() {
       )}
 
       {page === "reports" && (
-        <ReportsPage
-          savedEntries={savedEntries}
-          indentData={indentData}
-        />
+        <ReportsPage savedEntries={savedEntries} indentData={indentData} />
       )}
     </div>
   );
